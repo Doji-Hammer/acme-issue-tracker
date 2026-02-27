@@ -10,7 +10,7 @@ export const issues = sqliteTable('issues', {
   status: text('status', { enum: issueStatus }).notNull().default('open'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' })
     .notNull()
-    .$defaultFn(() => Date.now()),
+    .$defaultFn(() => new Date()),
 });
 
 export type Issue = typeof issues.$inferSelect;

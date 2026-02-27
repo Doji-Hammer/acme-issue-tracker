@@ -24,11 +24,7 @@ export async function createIssue(input: {
 }
 
 export async function updateIssueStatus(id: number, status: IssueStatus) {
-  const [updated] = await db
-    .update(issues)
-    .set({ status })
-    .where(eq(issues.id, id))
-    .returning();
+  const [updated] = await db.update(issues).set({ status }).where(eq(issues.id, id)).returning();
 
   return updated ?? null;
 }

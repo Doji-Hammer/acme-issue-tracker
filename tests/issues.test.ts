@@ -1,29 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import sqlite3 from 'sqlite3';
-import { drizzle } from 'drizzle-orm/sqlite3';
+import Database from 'better-sqlite3';
 import { desc } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { issues } from '../src/db/schema';
 
 describe('issues create/list flow', () => {
-  const sqlite = new sqlite3.Database(':memory:');
+  const sqlite = new Database(':memory:');
   const db = drizzle(sqlite);
 
-  beforeEach(async () => {
-    await new Promise<void>((resolve, reject) => {
-      sqlite.serialize(() => {
-        sqlite.run('DROP TABLE IF EXISTS issues');
-        sqlite.run(
-          `CREATE TABLE issues (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            description TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'open',
-            created_at INTEGER NOT NULL
-          )`,
-          (err) => (err ? reject(err) : resolve()),
-        );
-      });
-    });
+  beforeEach(() => {
+    sqlite.exec('DROP TABLE IF EXISTS issues');
+    sqlite.exec(`CREATE TABLE issues (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      created_at INTEGER NOT NULL
+    )`);
   });
 
   it('creates and lists issues in reverse id order', async () => {

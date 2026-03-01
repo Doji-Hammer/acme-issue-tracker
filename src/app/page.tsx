@@ -1,6 +1,18 @@
-import { listIssues } from '@/lib/issues';
-import { revalidatePath } from 'next/cache';
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import IssueForm from './components/IssueForm';
+import StatusButton from './components/StatusButton';
 import type { IssueStatus, IssuePriority } from '@/db/schema';
+
+type Issue = {
+  id: number;
+  title: string;
+  description: string;
+  status: IssueStatus;
+  priority: IssuePriority;
+  createdAt: number;
+};
 
 const statusLabels: Record<IssueStatus, string> = {
   open: 'Open',
@@ -20,65 +32,64 @@ const priorityLabels: Record<IssuePriority, string> = {
   high: '🔴 High',
 };
 
-async function createIssueAction(formData: FormData) {
-  'use server';
+export default function HomePage() {
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
-  const title = String(formData.get('title') ?? '').trim();
-  const description = String(formData.get('description') ?? '').trim();
-  const priority = String(formData.get('priority') ?? 'medium');
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  if (!title || !description) {
-    return;
-  }
+  const fetchIssues = useCallback(async () => {
+    const params = new URLSearchParams();
+    if (statusFilter) params.set('status', statusFilter);
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    const qs = params.toString();
+    const res = await fetch(`/api/issues${qs ? `?${qs}` : ''}`);
+    if (res.ok) {
+      return res.json() as Promise<Issue[]>;
+    }
+    return null;
+  }, [statusFilter, searchQuery]);
 
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'}/api/issues`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ title, description, status: 'open', priority }),
-    cache: 'no-store',
-  });
-
-  revalidatePath('/');
-}
-
-async function updateStatusAction(formData: FormData) {
-  'use server';
-  const id = Number(formData.get('id'));
-  const status = String(formData.get('status'));
-  if (!Number.isInteger(id)) return;
-
-  await fetch(`${process.env.NEXT_PUBLIC_BASE_URL ?? 'http://localhost:3000'}/api/issues/${id}`, {
-    method: 'PATCH',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ status }),
-    cache: 'no-store',
-  });
-
-  revalidatePath('/');
-}
-
-export default async function HomePage() {
-  const issues = await listIssues();
+  useEffect(() => {
+    let cancelled = false;
+    fetchIssues().then((data) => {
+      if (!cancelled && data) setIssues(data);
+    });
+    return () => { cancelled = true; };
+  }, [fetchIssues, refreshKey]);
 
   return (
     <main>
       <h1>ACME Issue Tracker</h1>
-      <form action={createIssueAction}>
-        <input name="title" placeholder="Issue title" required />
-        <textarea name="description" placeholder="Issue description" required />
-        <select name="priority" defaultValue="medium">
-          <option value="low">Low</option>
-          <option value="medium">Medium</option>
-          <option value="high">High</option>
+
+      <IssueForm onCreated={() => setRefreshKey((k) => k + 1)} />
+
+      <div style={{ margin: '16px 0', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          aria-label="Filter by status"
+        >
+          <option value="">All statuses</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In Progress</option>
+          <option value="done">Done</option>
         </select>
-        <button type="submit">Create Issue</button>
-      </form>
+        <input
+          type="search"
+          placeholder="Search by title…"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          aria-label="Search issues"
+        />
+      </div>
 
       <ul>
         {issues.map((issue) => (
           <li key={issue.id}>
             <strong>{issue.title}</strong>
-            <span>{priorityLabels[issue.priority]}</span>
+            <span> {priorityLabels[issue.priority]}</span>
             <p>{issue.description}</p>
             <p>
               Status:{' '}
@@ -95,18 +106,20 @@ export default async function HomePage() {
               </span>
             </p>
             {issue.status === 'open' && (
-              <form action={updateStatusAction}>
-                <input type="hidden" name="id" value={issue.id} />
-                <input type="hidden" name="status" value="in_progress" />
-                <button type="submit">Start Progress</button>
-              </form>
+              <StatusButton
+                issueId={issue.id}
+                targetStatus="in_progress"
+                label="Start Progress"
+                onUpdated={() => setRefreshKey((k) => k + 1)}
+              />
             )}
             {issue.status === 'in_progress' && (
-              <form action={updateStatusAction}>
-                <input type="hidden" name="id" value={issue.id} />
-                <input type="hidden" name="status" value="done" />
-                <button type="submit">Mark Done</button>
-              </form>
+              <StatusButton
+                issueId={issue.id}
+                targetStatus="done"
+                label="Mark Done"
+                onUpdated={() => setRefreshKey((k) => k + 1)}
+              />
             )}
           </li>
         ))}

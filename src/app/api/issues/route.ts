@@ -1,8 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createIssue, listIssues } from '@/lib/issues';
+import { type IssueStatus, issueStatus } from '@/db/schema';
 
-export async function GET() {
-  const data = await listIssues();
+export async function GET(req: NextRequest) {
+  const { searchParams } = req.nextUrl;
+  const status = searchParams.get('status') as IssueStatus | null;
+  const search = searchParams.get('search');
+
+  const filters: { status?: IssueStatus; search?: string } = {};
+  if (status && issueStatus.includes(status)) {
+    filters.status = status;
+  }
+  if (search) {
+    filters.search = search;
+  }
+
+  const data = await listIssues(filters);
   return NextResponse.json(data);
 }
 

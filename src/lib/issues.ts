@@ -1,9 +1,20 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, like } from 'drizzle-orm';
 import { issues, type IssueStatus } from '@/db/schema';
 import { db } from '@/lib/db';
 
-export async function listIssues() {
-  return db.select().from(issues).orderBy(desc(issues.id));
+export async function listIssues(filters?: { status?: IssueStatus; search?: string }) {
+  const conditions = [];
+  if (filters?.status) {
+    conditions.push(eq(issues.status, filters.status));
+  }
+  if (filters?.search) {
+    conditions.push(like(issues.title, `%${filters.search}%`));
+  }
+  return db
+    .select()
+    .from(issues)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(issues.id));
 }
 
 export async function createIssue(input: {

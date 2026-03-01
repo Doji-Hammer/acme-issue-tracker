@@ -1,5 +1,7 @@
 import { listIssues } from '@/lib/issues';
+import { type IssueStatus, issueStatus } from '@/db/schema';
 import { revalidatePath } from 'next/cache';
+import IssueFilters from './components/IssueFilters';
 
 async function createIssueAction(formData: FormData) {
   'use server';
@@ -36,12 +38,25 @@ async function closeIssueAction(formData: FormData) {
   revalidatePath('/');
 }
 
-export default async function HomePage() {
-  const issues = await listIssues();
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; search?: string }>;
+}) {
+  const params = await searchParams;
+  const filters: { status?: IssueStatus; search?: string } = {};
+  if (params.status && issueStatus.includes(params.status as IssueStatus)) {
+    filters.status = params.status as IssueStatus;
+  }
+  if (params.search) {
+    filters.search = params.search;
+  }
+  const allIssues = await listIssues(filters);
 
   return (
     <main>
       <h1>ACME Issue Tracker</h1>
+      <IssueFilters />
       <form action={createIssueAction}>
         <input name="title" placeholder="Issue title" required />
         <textarea name="description" placeholder="Issue description" required />
@@ -49,7 +64,7 @@ export default async function HomePage() {
       </form>
 
       <ul>
-        {issues.map((issue) => (
+        {allIssues.map((issue) => (
           <li key={issue.id}>
             <strong>{issue.title}</strong>
             <p>{issue.description}</p>

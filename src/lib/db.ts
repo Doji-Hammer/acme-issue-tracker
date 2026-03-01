@@ -14,6 +14,7 @@ sqlite.exec(`
     title TEXT NOT NULL,
     description TEXT NOT NULL,
     status TEXT NOT NULL DEFAULT 'open',
+    priority TEXT NOT NULL DEFAULT 'medium',
     created_at INTEGER NOT NULL
   )
 `);

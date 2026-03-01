@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, like } from 'drizzle-orm';
 import {
   issues,
   type IssueStatus,
@@ -9,8 +9,27 @@ import {
 } from '@/db/schema';
 import { db } from '@/lib/db';
 
-export async function listIssues() {
-  return db.select().from(issues).orderBy(desc(issues.id));
+export async function listIssues(opts?: {
+  status?: IssueStatus;
+  search?: string;
+}) {
+  let query = db.select().from(issues);
+
+  const conditions = [];
+  if (opts?.status) {
+    conditions.push(eq(issues.status, opts.status));
+  }
+  if (opts?.search) {
+    conditions.push(like(issues.title, `%${opts.search}%`));
+  }
+
+  if (conditions.length === 1) {
+    return query.where(conditions[0]).orderBy(desc(issues.id));
+  }
+  if (conditions.length === 2) {
+    return query.where(and(conditions[0], conditions[1])).orderBy(desc(issues.id));
+  }
+  return query.orderBy(desc(issues.id));
 }
 
 export async function getIssue(id: number) {
